@@ -1,0 +1,10 @@
+.DS_Store
+test.m
+
+*.csv
+*.pdf
+*.pages
+*.mat
+
+papers/
+
