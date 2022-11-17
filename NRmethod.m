@@ -1,6 +1,8 @@
 function [x] = NRmethod(x0, f, df)
+global DEBUG
+
 nMaxIter = 1000;
-tol = 1e-08;
+tol = 1e-06;
 
 xPrev = x0;
 
@@ -17,5 +19,8 @@ while true
     end
     xPrev = xNext;
     iter = iter + 1;
-    % fprintf("Iter : %d, x: %f\n", iter, xPrev);
+
+    if DEBUG
+%         fprintf("Iter : %d, x: %f\n", iter, xPrev);
+    end
 end

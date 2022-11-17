@@ -4,96 +4,60 @@ close all;
 % au = 149597870.7; % 1AU (km)
 % mu = 398600 / (au^3); %km^3 s^-2 % The Earth
 
+global mu PLOT DEBUG
+% mu = 4*pi^2;
+PLOT = false;
+DEBUG = false;
+
+% r1 = [1, 0, 0];
+% r2 = [0, 1.524, 0];
+% tf = 4;
+% lambmultifunc(r1, r2, tf);
+
 % Givens
-r1 = 1.0;
-r2 = 1.524;
-angle = 75; %deg
-Tf = 4;
-MU = 4*pi^2;
+Re = 6400;
+mu = 3.986e5;
 
-% Constants
-theta = deg2rad(75);
-c = sqrt(r1^2 + r2^2 - 2*r1*r2*cos(theta));
-s = (r1+r2+c)/2;
+chaser = OrbitElement(Re+2000, 0.002, 60, 30, 0, 0);
+target = OrbitElement(Re+36000, 0.0002, 55, 35, -20, 30);
 
-%% Determination of the Minimum Transfer Time
-a0 = 1.001*s/2;
-[~, Lower] = wrapfunc(c, s, MU);
+t1 = 1200:10:1400;
+t2 = 1200:10:1400;
+result = zeros(length(t1), length(t2));
+for i = 1:length(t1)
+    % calculate position vector, velocity vector
+    [r1, v1, theta1] = posvel(chaser.semimajor, chaser.eccentricity, chaser.true_anomaly, t1(i));
 
-N = 1;
-while true
-    funFN = @(a) Lower.funF(a, N);
-    funDFN = @(a) Lower.funDF(a, N);
+    for j = 1:length(t2)
+        [r2, v2, theta2] = posvel(target.semimajor, target.eccentricity, target.true_anomaly, t1(i)+t2(j));
+        [maxN, A, E] = lambmultifunc(r1, r2, t2(j));
 
-    a = NRmethod(a0, funFN, funDFN);
-    minTf = Lower.funTf(a, N); % Minimum transfer time for N
+        J = Inf;
+        for k = 1:length(A)
+            if (A(k) == 0)
+                continue;
+            end
 
-    if minTf > Tf
-        maxN = N-1;
-        fprintf("Maximum N is %d\n", maxN);
-        break;
-    else
-        % fprintf("Minimum Transfer Time for N = %d, a = %f, t = %f\n", N, a, t);
-        N = N+1;
-    end
-end
+            vt1 = sqrt(mu/(A(k)*(1-E(k)^2))) * [-sin(theta1), E(k)+cos(theta1)];
+            vt2 = sqrt(mu/(A(k)*(1-E(k)^2))) * [-sin(theta2), E(k)+cos(theta2)];
+            
+            dv1 = norm(vt1 - v1);
+            dv2 = norm(v2 - vt2);
+            
+            dv = dv1 + dv2;
 
-%% Multiple Revolution Lambert Problem Formulation (Plotting)
-a = linspace(0.9, 1.5, 100000);
-alpha = 2*asin(sqrt(s./(2*a)));
-
-if (theta >= 0 && theta < pi)
-    beta = 2*asin(sqrt((s-c)./(2*a)));
-else
-    beta = 2*pi - 2*asin(sqrt((s-c)./(2*a)));
-end
-
-funTf = @(a, alpha, beta, N) a.^(3/2).*(2*N*pi + alpha-beta ...
-    - (sin(alpha)-sin(beta))) ./ sqrt(MU); % transfer time
-
-figure();
-hold on;
-for N = 0:maxN
-    % Upper Part
-    t = funTf(a, alpha, beta, N);
-    I = find(t == real(t));
-    plot(a(I), t(I), 'r');
-
-    % Lower Part
-    t_minus = funTf(a, 2*pi-alpha, beta, N);
-    I = find(t == real(t));
-    plot(a(I), t_minus(I), 'r');
-end
-xlabel("Semamajor Axis, a"); ylabel("Time of Flight, tf");
-ylim([0 Tf]);
-title("Solutions for T >= t_minNmax");
-hold off;
-
-%% Solution to Multiple-Revolution Lambert's Problem
-a0 = 1.001*s/2;
-[Upper, Lower] = wrapfunc(c, s, MU);
-
-solLambert = [];
-for N = maxN:-1:1
-    funGNUpper = @(a) Upper.funTf(a, N) - Tf;
-    funDGNUpper = @(a) Upper.funDTf(a, N);
-    aUpper = NRmethod(a0, funGNUpper, funDGNUpper);
-    
-    funGNLower = @(a) Lower.funTf(a, N) - Tf;
-    funDGNLower = @(a) Lower.funDTf(a, N);
-    aLower = NRmethod(a0, funGNLower, funDGNLower);
-
-    if N == maxN
-        if Upper.funTf(aUpper, N) >= Tf
-            fprintf("upper solution at Nmax exceed given T");
-            solLambert(end+1) = aUpper;
+            if dv < J
+                J = dv;
+            end
         end
-        solLambert(end+1) = aLower;
-    else
-        solLambert(end+1) = aUpper; 
-        solLambert(end+1) = aLower;
+
+        if J == Inf
+            J = -1;
+        end
+        result(i, j) = J;
+        fprintf("i: %d, j: %d, J: %f\n", i, j, J);
     end
-    % fprintf("upper: %f, lower: %f\n", aUpper, aLower);
 end
 
-disp(solLambert);
+figure()
+contour(t1,t2,result);

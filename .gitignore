@@ -5,6 +5,7 @@ test.m
 *.pdf
 *.pages
 *.mat
+*.asv
 
 papers/
 
