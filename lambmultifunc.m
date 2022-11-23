@@ -8,7 +8,7 @@ function [maxN, solLambert, eLambert] = lambmultifunc(r1, r2, Tf)
 
 % r1     = initial chaser position vector (km)
 % r2     = initial target position vector (km)
-% tf     = transfer time (seconds)
+% tf     = transfer time (minutes)
 
 % output
 
@@ -19,10 +19,10 @@ function [maxN, solLambert, eLambert] = lambmultifunc(r1, r2, Tf)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 global mu PLOT DEBUG
 
-au = 149597870.7; % 1AU (km)
-r1 = r1./au;
-r2 = r2./au;
-Tf = Tf/(60*60*24*365);
+% au = 149597870.7; % 1AU (km)
+% r1 = r1./au;
+% r2 = r2./au;
+% Tf = Tf/(60*24*365); % minutes to year
 
 % true anomaly
 theta = acos(dot(r1, r2)/(norm(r1)*norm(r2)));
@@ -48,7 +48,10 @@ while true
     
     if minTf > Tf
         maxN = N-1;
-        fprintf("Maximum N is %d\n", maxN);
+        if DEBUG
+            fprintf("minTf: %f, Tf: %f\n", minTf, Tf);
+            fprintf("Maximum N is %d\n", maxN);
+        end
         break;
     else
         if DEBUG
@@ -117,11 +120,18 @@ for N = 0:maxN
         funDGNLower = @(a) Lower.funDTf(a, N);
         aLower = NRmethod(a0, funGNLower, funDGNLower);
     
-        funGNUpper = @(a) Upper.funTf(a, N) - Tf;
-        funDGNUpper = @(a) Upper.funDTf(a, N);
-        aUpper = NRmethod(a0, funGNUpper, funDGNUpper);
+        try
+            funGNUpper = @(a) Upper.funTf(a, N) - Tf;
+            funDGNUpper = @(a) Upper.funDTf(a, N);
+            aUpper = NRmethod(a0, funGNUpper, funDGNUpper);
+        catch
+            if DEBUG
+                fprintf("aUpper not converged\n");
+            end
+            aUpper = -1;
+        end
 
-        if Upper.funTf(aUpper, N) >= Tf
+        if aUpper == -1 || Upper.funTf(aUpper, N) >= Tf
             if DEBUG
                 fprintf("upper solution at Nmax exceed given T\n");
             end
